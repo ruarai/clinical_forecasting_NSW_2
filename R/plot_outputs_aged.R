@@ -1,13 +1,13 @@
 
 
-plot_outputs <- function(
-  all_outputs,
-  occupancy_data,
-  hospital_linelist,
-  forecast_dates,
-  plot_dir
+plot_outputs_aged <- function(
+    all_outputs,
+    occupancy_data_aged,
+    hospital_linelist,
+    forecast_dates,
+    plot_dir
 ) {
-  occupancy_data <- occupancy_data %>%
+  occupancy_data_aged <- occupancy_data_aged %>%
     filter(date >= ymd("2022-12-01"))
   
   
@@ -35,7 +35,7 @@ plot_outputs <- function(
   
   plot_data_occupancy <- all_outputs %>%
     mutate(scenario_label = factor(scenario_label, scenarios$scenario_label)) %>% 
-    group_by(scenario_label, bootstrap, date, group) %>%
+    group_by(scenario_label, bootstrap, date, group, age_group) %>%
     summarise(count = sum(count), .groups = "drop") %>%
     pivot_wider(names_from = "bootstrap",
                 names_prefix = "sim_",
@@ -52,13 +52,15 @@ plot_outputs <- function(
     
     geom_point(aes(x = date, y = count),
                size = 0.9, stroke = 0, colour = "white",
-               occupancy_data %>% filter(group == "ward")) +
+               occupancy_data_aged %>% filter(group == "ward")) +
     
     geom_point(aes(x = date, y = count),
                pch = 1, size = 0.9, stroke = 0.7,
-               occupancy_data %>% filter(group == "ward")) +
+               occupancy_data_aged %>% filter(group == "ward")) +
     
     p_common +
+    
+    facet_wrap(~age_group) +
     
     ggtitle("Daily ward occupancy") 
   
@@ -73,13 +75,15 @@ plot_outputs <- function(
     
     geom_point(aes(x = date, y = count),
                size = 0.9, stroke = 0, colour = "white",
-               occupancy_data %>% filter(group == "ICU")) +
+               occupancy_data_aged %>% filter(group == "ICU")) +
     
     geom_point(aes(x = date, y = count),
                pch = 1, size = 0.9, stroke = 0.7,
-               occupancy_data %>% filter(group == "ICU")) +
+               occupancy_data_aged %>% filter(group == "ICU")) +
     
     p_common +
+    
+    facet_wrap(~age_group) +
     
     ggtitle("Daily ICU occupancy") 
   
@@ -94,13 +98,13 @@ plot_outputs <- function(
     ungroup()
   
   admission_counts <- hospital_linelist_subset %>%
-    count(date_admit) %>%
+    count(date_admit, age_group) %>%
     filter(date_admit >= ymd("2022-12-01"))
   
   
   plot_data_admissions <- all_outputs %>%
     mutate(scenario_label = factor(scenario_label, scenarios$scenario_label)) %>%
-    group_by(scenario_label, bootstrap, date, group) %>%
+    group_by(scenario_label, bootstrap, date, group, age_group) %>%
     summarise(admissions = sum(admissions), .groups = "drop") %>%
     pivot_wider(names_from = "bootstrap",
                 names_prefix = "sim_",
@@ -123,6 +127,8 @@ plot_outputs <- function(
                pch = 1, size = 0.9, stroke = 0.7,
                admission_counts) +
     
+    facet_wrap(~age_group) +
+    
     p_common +
     
     ggtitle("Daily ward admissions") 
@@ -130,7 +136,7 @@ plot_outputs <- function(
   
   
   ICU_admission_counts <- hospital_linelist_subset %>%
-    count(date_ICU_admit) %>%
+    count(date_ICU_admit, age_group) %>%
     filter(date_ICU_admit >= ymd("2022-12-01"))
   
   
@@ -153,6 +159,8 @@ plot_outputs <- function(
     
     p_common +
     
+    facet_wrap(~age_group) +
+    
     ggtitle("Daily ICU admissions") 
   
   
@@ -164,7 +172,7 @@ plot_outputs <- function(
   
   cowplot::plot_grid(
     cowplot::plot_grid(
-      p_ward_admissions, p_ward_occupancy, p_ICU_occupancy,
+      p_ward_admissions, p_ward_occupancy,
       ncol = 1, align = "v"
     ),
     cowplot::get_legend(
@@ -178,7 +186,7 @@ plot_outputs <- function(
   )
   
   
-  ggsave(str_c(plot_dir, "/results_combined_ward.png"), width = 7, height = 8, bg = "white")
+  ggsave(str_c(plot_dir, "/results_combined_ward_aged.png"), width = 10, height = 9, bg = "white")
   
   
   
@@ -200,6 +208,6 @@ plot_outputs <- function(
   )
   
   
-  ggsave(str_c(plot_dir, "/results_combined_ICU.png"), width = 7, height = 6, bg = "white")
+  ggsave(str_c(plot_dir, "/results_combined_ICU_aged.png"), width = 10, height = 9, bg = "white")
   
 }

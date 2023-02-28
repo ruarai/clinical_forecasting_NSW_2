@@ -6,7 +6,10 @@ make_case_trajectory <- function(
     
     case_linelist,
     
-    forecast_dates
+    forecast_dates,
+    
+    scenario_label,
+    plot_dir
 ) {
   # Count the number of detected cases for each onset date, bounded by our simulation and forecast dates
   nsw_cases_count <- case_linelist %>%
@@ -44,16 +47,15 @@ make_case_trajectory <- function(
     
     mutate(count = zoo::na.approx(count))
   
-  # Produce a plot of the case trajectory
-  # If points are missing along the trajectory in the plot, this is where imputation has occurred
+  
   ggplot() +
-    geom_point(aes(x = date_onset, y = count),
+    geom_point(aes(x = date_onset, y = count, colour = "unimputed"),
                case_trajectory_unimputed, size = 0.4) +
-    geom_line(aes(x = date_onset, y = count),
+    geom_line(aes(x = date_onset, y = count, colour = "final"),
               case_trajectory) +
-    geom_line(aes(x = date_onset, y = count),
+    geom_line(aes(x = date_onset, y = count, colour = "forecast"),
               case_forecast)  +
-    geom_line(aes(x = date_onset, y = count),
+    geom_line(aes(x = date_onset, y = count, colour = "nsw_cases"),
               nsw_cases_count) +
     
     scale_x_date(date_breaks = "months", labels = scales::label_date_short()) +
@@ -61,6 +63,7 @@ make_case_trajectory <- function(
     theme_minimal()
   
   
+  ggsave(str_c(plot_dir, "/case_trajectory_", scenario_label, ".png"), width = 6, height = 6, bg = "white")
   
   case_trajectory
 }

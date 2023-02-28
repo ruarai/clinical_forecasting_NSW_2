@@ -34,7 +34,7 @@ sample_outputs <- function(
     distinct(age_group, person_id, days) %>% 
     
     group_by(age_group, person_id) %>%
-    summarise(days = list(days)) %>%
+    summarise(days = list(days), .groups = "drop") %>%
     
     count(age_group, days) %>%
     mutate(p = n / sum(n))
@@ -144,7 +144,7 @@ sample_outputs <- function(
     distinct(age_group, person_id, days) %>% 
     
     group_by(age_group, person_id) %>%
-    summarise(days = list(days)) %>%
+    summarise(days = list(days), .groups = "drop") %>%
     
     count(age_group, days) %>%
     mutate(p = n / sum(n))

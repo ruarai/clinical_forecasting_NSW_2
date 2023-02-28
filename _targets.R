@@ -12,11 +12,14 @@ source("R/format_linelists.R")
 
 source("R/get_time_varying_estimates.R")
 source("R/make_case_trajectory.R")
-source("R/forecast_time_varying_estimates.R")
 
 source("R/calculate_occupancy.R")
 
 source("R/sample_outputs.R")
+
+source("R/plot_outputs.R")
+source("R/plot_outputs_aged.R")
+source("R/plot_time_varying_estimates.R")
 
 
 scenarios <- tribble(
@@ -35,9 +38,9 @@ targets_map <- tar_map(
     read_csv(forecast_path, show_col_types = FALSE) %>% select(date_onset = Date, count = scenario_column) %>% mutate(date_onset = dmy(date_onset))
   ),
   
-  tar_target(case_trajectory, make_case_trajectory(case_forecast, ascertainment, case_linelist, forecast_dates)),
+  tar_target(case_trajectory, make_case_trajectory(case_forecast, ascertainment, case_linelist, forecast_dates, scenario_label, plot_dir)),
   
-  tar_target(outputs, sample_outputs(case_trajectory, hospital_linelist, time_varying_estimates_forecast, forecast_dates, ascertainment) %>%
+  tar_target(outputs, sample_outputs(case_trajectory, hospital_linelist, time_varying_estimates, forecast_dates, ascertainment) %>%
                mutate(scenario_label = scenario_label))
   
 )
@@ -48,6 +51,17 @@ list(
   
   tar_target(forecast_path, "~/source/clinical_forecasting_NSW/data/cases/Projections_20230227a.csv"),
   tar_target(asc_path, "~/source/clinical_forecasting_NSW/data/cases/Ascertainment0227a.csv"),
+  
+  tar_target(forecast_date, ymd("2023-02-28")),
+  
+  tar_target(
+    plot_dir,
+    {
+      dir <- str_c("results/fc_NSW_", forecast_date, "/")
+      dir.create(dir, showWarnings = FALSE)
+      return(dir)
+    }
+  ),
   
   
   tar_target(
@@ -74,7 +88,6 @@ list(
   
   tar_target(time_varying_estimates, get_time_varying_estimates(case_linelist, hospital_linelist, forecast_dates, n_bootstraps)),
   
-  tar_target(time_varying_estimates_forecast, forecast_time_varying_estimates(time_varying_estimates)),
   
   targets_map,
   
@@ -83,6 +96,23 @@ list(
     all_outputs,
     targets_map[["outputs"]],
     command = dplyr::bind_rows(!!!.x)
+  ),
+  
+  
+  tar_target(
+    output_plots,
+    plot_outputs(all_outputs, occupancy_data, hospital_linelist, forecast_dates, plot_dir)
+  ),
+  
+  
+  tar_target(
+    output_plots_aged,
+    plot_outputs(all_outputs, occupancy_data_aged, hospital_linelist, forecast_dates, plot_dir)
+  ),
+  
+  tar_target(
+    time_varying_estimates_plots,
+    plot_time_varying_estimates(time_varying_estimates, forecast_dates, plot_dir)
   )
   
   
