@@ -4,6 +4,7 @@ plot_outputs <- function(
   all_outputs,
   occupancy_data,
   hospital_linelist,
+  ED_linelist,
   forecast_dates,
   plot_dir
 ) {
@@ -156,11 +157,48 @@ plot_outputs <- function(
     ggtitle("Daily ICU admissions") 
   
   
+  ED_linelist_subset <- ED_linelist  %>%
+    
+    filter(date_onset >= forecast_dates$date_estimates_start,
+           date_presentation < forecast_dates$date_hospital_linelist - days(2)) %>% 
+    
+    arrange(date_presentation) %>%
+    group_by(person_id) %>%
+    slice(1) %>%
+    ungroup()
+  
+  
+  ED_presentation_counts <- ED_linelist_subset %>%
+    count(date_presentation) %>%
+    filter(date_presentation >= ymd("2022-12-01"))
+  
+  
+  p_ED_presentations <- plot_data_admissions %>%
+    filter(group == "ED") %>% 
+    ggplot() +
+    
+    geom_ribbon(aes(x = date, ymin = lower, ymax = upper,
+                    fill = interaction(quant, scenario_label),
+                    group = interaction(quant, scenario_label))) +
+    
+    geom_point(aes(x = date_presentation, y = n),
+               size = 0.9, stroke = 0, colour = "white",
+               ED_presentation_counts) +
+    
+    geom_point(aes(x = date_presentation, y = n),
+               pch = 1, size = 0.9, stroke = 0.7,
+               ED_presentation_counts) +
+    
+    p_common +
+    
+    ggtitle("Daily ED presentations") 
   
   
   
   forecast_labels <- scenarios$scenario_name %>% 
     `names<-`(scenarios$scenario_label)
+  
+  
   
   cowplot::plot_grid(
     cowplot::plot_grid(
@@ -202,4 +240,19 @@ plot_outputs <- function(
   
   ggsave(str_c(plot_dir, "/results_combined_ICU.png"), width = 7, height = 6, bg = "white")
   
+  
+  
+  cowplot::plot_grid(
+    p_ED_presentations,
+    cowplot::get_legend(
+      ggplot(plot_data_admissions %>% filter(quant == 50)) + 
+        geom_ribbon(aes(x = date, ymin = lower, ymax = upper, fill = scenario_label)) +
+        scale_fill_manual(values = ggokabeito::palette_okabe_ito(c(1,2,3, 5)), labels = forecast_labels, name = NULL) + 
+        theme(legend.position = "bottom")
+    ),
+    ncol = 1,
+    rel_heights = c(12, 1)
+  )
+  
+  ggsave(str_c(plot_dir, "/results_combined_ED.png"), width = 7, height = 5, bg = "white")
 }

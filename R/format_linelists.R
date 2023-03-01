@@ -1,6 +1,6 @@
 
 
-format_case_linelist <- function(case_linelist_raw, forecast_dates) {
+format_case_linelist <- function(case_linelist_raw) {
   source("R/age_groups.R")
   
   case_linelist_raw %>%
@@ -16,7 +16,7 @@ format_case_linelist <- function(case_linelist_raw, forecast_dates) {
   
 }
 
-format_hospital_linelist <- function(hospital_linelist_raw, forecast_dates) {
+format_hospital_linelist <- function(hospital_linelist_raw) {
   source("R/age_groups.R")
   
   hospital_linelist_raw %>%
@@ -58,4 +58,30 @@ format_hospital_linelist <- function(hospital_linelist_raw, forecast_dates) {
     select(-drop_ICU) %>% 
     
     filter(date_discharge >= date_admit)
+}
+
+
+
+format_ED_linelist <- function(ED_linelist_raw) {
+  source("R/age_groups.R")
+  
+  ED_linelist_raw %>%
+    mutate(age_group = assign_10yr_age_group(age),
+           date_onset = as_date(ncims_calc_onset_dt)) %>% 
+    
+    drop_na(age_group, date_onset) %>%
+    
+    select(person_id,
+           date_onset,
+           age_group,
+           
+           date_presentation = presentation_date) %>%
+    
+    filter(
+      date_onset >= ymd("2022-01-01")
+    ) %>% 
+    
+    mutate(
+      date_presentation = as_date(date_presentation)
+    ) 
 }

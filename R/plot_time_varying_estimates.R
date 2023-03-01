@@ -132,6 +132,47 @@ plot_time_varying_estimates <- function(
   
   
   
+  plot_data_ED <- time_varying_estimates %>%
+    select(bootstrap, date_onset, age_group, pr_ED) %>%
+    filter(date_onset >= forecast_dates$date_estimates_start) %>% 
+    
+    group_by(date_onset, age_group) %>%
+    
+    summarise(median = median(pr_ED),
+              lower_90 = quantile(pr_ED, 0.05, na.rm = TRUE),
+              upper_90 = quantile(pr_ED, 0.95, na.rm = TRUE))
+  
+  
+  
+  
+  p_ED <- ggplot(plot_data_ED) +
+    geom_line(aes(x = date_onset, y = median),
+              color = ggokabeito::palette_okabe_ito(2)) +
+    
+    geom_ribbon(aes(x = date_onset, ymin = lower_90, ymax = upper_90),
+                fill = ggokabeito::palette_okabe_ito(2),
+                colour = "white",
+                alpha = 0.3,
+                plot_data_ED) +
+    
+    geom_hline(yintercept = 0, colour = "grey80") +
+    
+    scale_x_date(date_breaks = "months", labels = scales::label_date_short()) +
+    
+    geom_blank(aes(y = 0)) +
+    
+    
+    facet_wrap(~age_group, scales = "free_y") +
+    
+    theme_minimal() +
+    ylab(NULL) + xlab(NULL) +
+    
+    ggtitle("Observed conversion rate to ED presentation")
+  
+  p_ED
+  
+  ggsave(str_c(plot_dir, "/time_varying_estimates_ED.png"), width = 10, height = 6, bg = "white")
+  
 }
 
 

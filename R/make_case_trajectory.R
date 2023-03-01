@@ -60,7 +60,9 @@ make_case_trajectory <- function(
     
     scale_x_date(date_breaks = "months", labels = scales::label_date_short()) +
     
-    theme_minimal()
+    theme_minimal() +
+    
+    coord_cartesian(ylim = c(0, NA))
   
   
   ggsave(str_c(plot_dir, "/case_trajectory_", scenario_label, ".png"), width = 6, height = 6, bg = "white")

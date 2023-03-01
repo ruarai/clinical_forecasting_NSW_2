@@ -2,7 +2,8 @@
 sample_outputs <- function(
     case_trajectory,
     hospital_linelist,
-    time_varying_estimates_forecast,
+    ED_linelist,
+    time_varying_estimates,
     forecast_dates,
     ascertainment
 ) {
@@ -39,7 +40,7 @@ sample_outputs <- function(
     count(age_group, days) %>%
     mutate(p = n / sum(n))
   
-  time_varying_estimates_expand <- time_varying_estimates_forecast %>%
+  time_varying_estimates_expand <- time_varying_estimates %>%
     filter(date_onset >= min(case_trajectory$date_onset), date_onset <= max(case_trajectory$date_onset)) %>% 
     complete(
       date_onset = seq(min(case_trajectory$date_onset), max(case_trajectory$date_onset), "days"),
@@ -48,7 +49,7 @@ sample_outputs <- function(
     ) %>%
     arrange(date_onset) %>%
     group_by(bootstrap, age_group) %>%
-    fill(pr_hosp, pr_ICU, pr_age_given_case, .direction = "downup")
+    fill(pr_hosp, pr_ICU, pr_ED, pr_age_given_case, .direction = "downup")
   
   asc_expand <- ascertainment %>%
     filter(date_onset >= min(case_trajectory$date_onset), date_onset <= max(case_trajectory$date_onset)) %>% 
@@ -214,6 +215,73 @@ sample_outputs <- function(
   
   
   
+  ED_days <- ED_linelist %>%
+    
+    filter(date_presentation < forecast_dates$date_hospital_linelist - days(14)) %>%
+    
+    select(person_id, age_group, 
+           date_onset, date = date_presentation) %>%
+    
+    select(person_id, age_group, date_onset, date) %>% 
+    mutate(days = as.numeric(date - date_onset)) %>%
+    arrange(days)
+  
+  
+  ED_days_counts <- ED_days %>% 
+    mutate(days = if_else(days < 0 | days > 14, NA_real_, days)) %>% 
+    distinct(age_group, person_id, days) %>% 
+    
+    count(age_group, days) %>%
+    mutate(p = n / sum(n))
+  
+  
+  
+  
+  ED_patient_tbl <- case_trajectory %>%
+    left_join(time_varying_estimates_expand, by = "date_onset") %>%
+    left_join(asc_expand, by = "date_onset") %>%
+    
+    mutate(n_ED = count * pr_age_given_case * pr_ED * asc) %>% 
+    select(bootstrap, date_onset, age_group, n_ED) %>%
+    
+    mutate(n_ED = if_else(n_ED >= runif(n()), n_ED + 0.5, n_ED - 0.5) %>% round()) %>% 
+    
+    rowwise() %>%
+    mutate(patient = list(seq_len(n_ED))) %>%
+    unnest(patient)
+  
+  sampled_ED <- map(
+    age_groups,
+    function(i_age) {
+      patient_tbl_age <- ED_patient_tbl %>% 
+        filter(age_group == i_age)
+      
+      bind_cols(
+        patient_tbl_age,
+        sample_n(
+          ED_days_counts %>% filter(age_group == i_age),
+          nrow(patient_tbl_age),
+          replace = TRUE,
+          weight = p
+        ) %>%
+          ungroup() %>%
+          select(days)
+      )
+    } 
+  ) %>%
+    bind_rows()
+  
+  
+  sampled_ED_presentations <- sampled_ED %>%
+    drop_na(days) %>%
+    mutate(date = date_onset + days) %>% 
+    count(bootstrap, age_group, date) %>% 
+    
+    filter(date <= max(case_trajectory$date_onset),
+           date >= forecast_dates$date_estimates_start + days(14))
+  
+  
+  
   bind_rows(
     sampled_ward_counts %>%
       rename(count = n) %>% 
@@ -234,6 +302,15 @@ sample_outputs <- function(
       
       by = c("date", "age_group", "bootstrap", "group")
     ) %>%
+    
+    bind_rows(
+      sampled_ED_presentations %>%
+        rename(admissions = n) %>% 
+        mutate(group = "ED", count = 0) %>%
+        complete(date = seq(min(sampled_ward_counts$date), max(sampled_ward_counts$date), "days"),
+                 age_group,
+                 fill = list(admissions = 0))
+    ) %>% 
     
     select(bootstrap, date, age_group, group, count, admissions) %>%
     
