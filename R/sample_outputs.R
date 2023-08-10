@@ -29,7 +29,6 @@ sample_outputs <- function(
     arrange(days)
   
   
-  
   ward_days_counts <- ward_days %>% 
     mutate(days = if_else(days < 0 | days > 14, NA_real_, days)) %>% 
     distinct(age_group, person_id, days) %>% 
@@ -51,27 +50,62 @@ sample_outputs <- function(
     group_by(bootstrap, age_group) %>%
     fill(pr_hosp, pr_ICU, pr_ED, pr_age_given_case, .direction = "downup")
   
-  asc_expand <- ascertainment %>%
-    filter(date_onset >= min(case_trajectory$date_onset), date_onset <= max(case_trajectory$date_onset)) %>% 
+  time_varying_estimates_subset <- time_varying_estimates %>%
+    filter(date_onset >= min(case_trajectory$date_onset), date_onset <= max(case_trajectory$date_onset)) 
+  
+  
+  time_varying_estimates_expand <- time_varying_estimates_subset %>%
+    
+    bind_rows(
+      time_varying_estimates_subset %>% filter(date_onset == max(date_onset)) %>%
+        mutate(date_onset = date_onset + days(14)),
+      time_varying_estimates_subset %>% filter(date_onset == ymd("2023-05-15")) %>% 
+        mutate(date_onset = max(time_varying_estimates_subset$date_onset) + days(60)),
+    ) %>% 
+    
+    
     complete(
-      date_onset = seq(min(case_trajectory$date_onset), max(case_trajectory$date_onset), "days")
+      date_onset = seq(min(time_varying_estimates_subset$date_onset), max(case_trajectory$date_onset), "days"),
+      bootstrap,
+      age_group
+    ) %>%
+    arrange(date_onset) %>%
+    group_by(bootstrap, age_group) %>%
+    mutate(pr_hosp = zoo::na.approx(pr_hosp, rule = 2),
+           pr_ICU = zoo::na.approx(pr_ICU, rule = 2),
+           pr_ED = zoo::na.approx(pr_ED, rule = 2),
+           pr_age_given_case = zoo::na.approx(pr_age_given_case, rule = 2)
+    ) %>%
+    group_by(bootstrap, date_onset) %>%
+    mutate(pr_age_given_case = pr_age_given_case / sum(pr_age_given_case)) %>%
+    ungroup()
+  
+  
+  asc_expand <- ascertainment %>%
+    filter(date_onset >= min(time_varying_estimates_subset$date_onset), date_onset <= max(case_trajectory$date_onset)) %>% 
+    complete(
+      date_onset = seq(min(time_varying_estimates_subset$date_onset), max(case_trajectory$date_onset), "days")
     ) %>%
     arrange(date_onset) %>%
     fill(asc, .direction = "downup")
   
   
   patient_tbl <- case_trajectory %>%
+    filter(date_onset >= min(time_varying_estimates_subset$date_onset)) %>% 
     left_join(time_varying_estimates_expand, by = "date_onset") %>%
     left_join(asc_expand, by = "date_onset") %>%
     
     mutate(n_hosp = count * pr_age_given_case * pr_hosp * asc) %>% 
     select(bootstrap, date_onset, age_group, n_hosp) %>%
     
-    mutate(n_hosp = if_else(n_hosp >= runif(n()), n_hosp + 0.5, n_hosp - 0.5) %>% round()) %>% 
+    mutate(n_hosp = if_else(n_hosp - floor(n_hosp) >= runif(n()), n_hosp + 0.5, n_hosp - 0.5) %>% round()) %>% 
     
     rowwise() %>%
     mutate(patient = list(seq_len(round(n_hosp))))  %>%
     unnest(patient)
+  
+  
+  
   
   
   sampled_ward <- map(
@@ -153,6 +187,7 @@ sample_outputs <- function(
   
   
   ICU_patient_tbl <- case_trajectory %>%
+    filter(date_onset >= min(time_varying_estimates_subset$date_onset)) %>%
     left_join(time_varying_estimates_expand, by = "date_onset") %>%
     left_join(asc_expand, by = "date_onset") %>%
     
@@ -238,6 +273,7 @@ sample_outputs <- function(
   
   
   ED_patient_tbl <- case_trajectory %>%
+    filter(date_onset >= min(time_varying_estimates_subset$date_onset)) %>%
     left_join(time_varying_estimates_expand, by = "date_onset") %>%
     left_join(asc_expand, by = "date_onset") %>%
     

@@ -8,8 +8,11 @@ plot_outputs_aged <- function(
     forecast_dates,
     plot_dir
 ) {
+  plot_start_date <- ymd("2022-12-01")
+  
   occupancy_data_aged <- occupancy_data_aged %>%
-    filter(date >= ymd("2022-12-01"))
+    filter(date >= plot_start_date)
+    #filter(date >= forecast_dates$date_estimates_start + days(5))
   
   
   
@@ -41,7 +44,7 @@ plot_outputs_aged <- function(
     pivot_wider(names_from = "bootstrap",
                 names_prefix = "sim_",
                 values_from = "count") %>%
-    make_results_quants(c(0.5, 0.7, 0.9))
+    make_results_quants(c(0.5, 0.7, 0.9), na.rm = TRUE)
   
   p_ward_occupancy <- plot_data_occupancy %>%
     filter(group == "ward") %>% 
@@ -90,8 +93,11 @@ plot_outputs_aged <- function(
   
   hospital_linelist_subset <- hospital_linelist  %>%
     
-    filter(date_onset >= forecast_dates$date_estimates_start,
-           date_admit < forecast_dates$date_hospital_linelist - days(2)) %>% 
+    filter(
+      #date_onset >= forecast_dates$date_estimates_start,
+      date_onset >= plot_start_date,
+      date_admit < forecast_dates$date_hospital_linelist - days(2)
+    ) %>% 
     
     arrange(date_admit) %>%
     group_by(person_id) %>%
@@ -100,7 +106,9 @@ plot_outputs_aged <- function(
   
   admission_counts <- hospital_linelist_subset %>%
     count(date_admit, age_group) %>%
-    filter(date_admit >= ymd("2022-12-01"))
+    filter(date_admit >= plot_start_date + days(5))
+    #filter(date_admit >= forecast_dates$date_estimates_start + days(5))
+  
   
   
   plot_data_admissions <- all_outputs %>%
@@ -111,7 +119,7 @@ plot_outputs_aged <- function(
                 names_prefix = "sim_",
                 values_from = "admissions") %>%
     mutate(across(starts_with("sim_"), ~ replace_na(., 0))) %>% 
-    make_results_quants(c(0.5, 0.7, 0.9))
+    make_results_quants(c(0.5, 0.7, 0.9), na.rm = TRUE)
   
   p_ward_admissions <- plot_data_admissions %>%
     filter(group == "ward") %>% 
@@ -139,7 +147,9 @@ plot_outputs_aged <- function(
   
   ICU_admission_counts <- hospital_linelist_subset %>%
     count(date_ICU_admit, age_group) %>%
-    filter(date_ICU_admit >= ymd("2022-12-01"))
+    filter(date_ICU_admit >= plot_start_date + days(5))
+    #filter(date_ICU_admit >= forecast_dates$date_estimates_start + days(5))
+  
   
   
   
@@ -167,10 +177,14 @@ plot_outputs_aged <- function(
   
   
   
-  ED_linelist_subset <- ED_linelist %>%
+  ED_linelist_subset <- ED_linelist  %>%
     
-    filter(date_onset >= forecast_dates$date_estimates_start,
-           date_presentation < forecast_dates$date_hospital_linelist - days(2)) %>% 
+    filter(
+      #date_onset >= forecast_dates$date_estimates_start,
+      date_onset >= plot_start_date,
+      date_presentation < forecast_dates$date_hospital_linelist - days(2),
+      date_presentation >= date_onset, date_presentation <= date_onset + days(14)
+    ) %>% 
     
     arrange(date_presentation) %>%
     group_by(person_id) %>%
@@ -180,7 +194,9 @@ plot_outputs_aged <- function(
   
   ED_presentation_counts <- ED_linelist_subset %>%
     count(date_presentation, age_group) %>%
-    filter(date_presentation >= ymd("2022-12-01"))
+    filter(date_presentation >= plot_start_date + days(5))
+    #filter(date_presentation >= forecast_dates$date_estimates_start + days(5))
+  
   
   
   p_ED_presentations <- plot_data_admissions %>%
@@ -219,14 +235,14 @@ plot_outputs_aged <- function(
       ggplot(plot_data_admissions %>% filter(quant == 50)) + 
         geom_ribbon(aes(x = date, ymin = lower, ymax = upper, fill = scenario_label)) +
         scale_fill_manual(values = ggokabeito::palette_okabe_ito(c(1,2,3, 5)), labels = forecast_labels, name = NULL) + 
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom", legend.direction = "vertical")
     ),
     ncol = 1,
-    rel_heights = c(12, 1)
+    rel_heights = c(12, 3)
   )
   
   
-  ggsave(str_c(plot_dir, "/results_combined_ward_aged.png"), width = 10, height = 9, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_results_combined_ward_aged.png"), width = 10, height = 9, bg = "white")
   
   
   
@@ -241,14 +257,14 @@ plot_outputs_aged <- function(
       ggplot(plot_data_admissions %>% filter(quant == 50)) + 
         geom_ribbon(aes(x = date, ymin = lower, ymax = upper, fill = scenario_label)) +
         scale_fill_manual(values = ggokabeito::palette_okabe_ito(c(1,2,3, 5)), labels = forecast_labels, name = NULL) + 
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom", legend.direction = "vertical")
     ),
     ncol = 1,
-    rel_heights = c(12, 1)
+    rel_heights = c(12, 3)
   )
   
   
-  ggsave(str_c(plot_dir, "/results_combined_ICU_aged.png"), width = 10, height = 9, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_results_combined_ICU_aged.png"), width = 10, height = 9, bg = "white")
   
   
   cowplot::plot_grid(
@@ -257,12 +273,12 @@ plot_outputs_aged <- function(
       ggplot(plot_data_admissions %>% filter(quant == 50)) + 
         geom_ribbon(aes(x = date, ymin = lower, ymax = upper, fill = scenario_label)) +
         scale_fill_manual(values = ggokabeito::palette_okabe_ito(c(1,2,3, 5)), labels = forecast_labels, name = NULL) + 
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom", legend.direction = "vertical")
     ),
     ncol = 1,
-    rel_heights = c(12, 1)
+    rel_heights = c(12, 3)
   )
   
-  ggsave(str_c(plot_dir, "/results_combined_ED_aged.png"), width = 7, height = 5, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_results_combined_ED_aged.png"), width = 7, height = 5, bg = "white")
   
 }

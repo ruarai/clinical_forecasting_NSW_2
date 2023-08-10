@@ -8,8 +8,10 @@ plot_outputs <- function(
   forecast_dates,
   plot_dir
 ) {
+  plot_start_date <- ymd("2022-12-01")
+  
   occupancy_data <- occupancy_data %>%
-    filter(date >= ymd("2022-12-01"))
+    filter(date >= plot_start_date)
   
   
   
@@ -29,9 +31,10 @@ plot_outputs <- function(
     geom_vline(xintercept = forecast_dates$date_case_linelist, linetype = "dashed"),
     xlab(NULL), ylab(NULL),
     theme_minimal(), theme(legend.position = "none"),
-    scale_y_continuous(breaks = scales::breaks_extended(4), labels = scales::label_comma()),
+    scale_y_continuous(breaks = scales::breaks_extended(4), labels = scales::label_comma(),
+                       expand = expansion(mult = c(0.05, 0.25))),
     scale_x_date(breaks = scales::date_breaks("months"), labels = scales::label_date_short()),
-    coord_cartesian(ylim = c(0, NA))
+    coord_cartesian(ylim = c(0, NA), xlim = c(plot_start_date, NA))
   )
   
   plot_data_occupancy <- all_outputs %>%
@@ -41,7 +44,7 @@ plot_outputs <- function(
     pivot_wider(names_from = "bootstrap",
                 names_prefix = "sim_",
                 values_from = "count") %>%
-    make_results_quants(c(0.5, 0.7, 0.9))
+    make_results_quants(c(0.5, 0.7, 0.9), na.rm = TRUE)
   
   p_ward_occupancy <- plot_data_occupancy %>%
     filter(group == "ward") %>% 
@@ -61,8 +64,7 @@ plot_outputs <- function(
     
     p_common +
     
-    ggtitle("Daily ward occupancy") 
-  
+    ggtitle("Daily ward occupancy")
   
   p_ICU_occupancy <- plot_data_occupancy %>%
     filter(group == "ICU") %>% 
@@ -86,17 +88,24 @@ plot_outputs <- function(
   
   hospital_linelist_subset <- hospital_linelist  %>%
     
-    filter(date_onset >= forecast_dates$date_estimates_start,
-           date_admit < forecast_dates$date_hospital_linelist - days(2)) %>% 
+    filter(
+      #date_onset >= forecast_dates$date_estimates_start,
+      date_onset >= plot_start_date,
+      #date_admit < forecast_dates$date_hospital_linelist - days(2)
+    ) %>% 
     
-    arrange(date_admit) %>%
+    #arrange(date_admit) %>%
     group_by(person_id) %>%
     slice(1) %>%
     ungroup()
   
   admission_counts <- hospital_linelist_subset %>%
     count(date_admit) %>%
-    filter(date_admit >= ymd("2022-12-01"))
+    filter(date_admit >= plot_start_date + days(5))
+    #filter(date_admit >= forecast_dates$date_estimates_start + days(5))
+  
+  admission_counts_smooth <- admission_counts %>%
+    mutate(n = zoo::rollmean(n, 7, fill = NA))
   
   
   plot_data_admissions <- all_outputs %>%
@@ -106,7 +115,7 @@ plot_outputs <- function(
     pivot_wider(names_from = "bootstrap",
                 names_prefix = "sim_",
                 values_from = "admissions") %>%
-    make_results_quants(c(0.5, 0.7, 0.9))
+    make_results_quants(c(0.5, 0.7, 0.9), na.rm = TRUE)
   
   p_ward_admissions <- plot_data_admissions %>%
     filter(group == "ward") %>% 
@@ -124,6 +133,9 @@ plot_outputs <- function(
                pch = 1, size = 0.9, stroke = 0.7,
                admission_counts) +
     
+    geom_line(aes(x = date_admit, y = n),
+              admission_counts_smooth) +
+    
     p_common +
     
     ggtitle("Daily ward admissions") 
@@ -132,7 +144,9 @@ plot_outputs <- function(
   
   ICU_admission_counts <- hospital_linelist_subset %>%
     count(date_ICU_admit) %>%
-    filter(date_ICU_admit >= ymd("2022-12-01"))
+    filter(date_ICU_admit >= plot_start_date + days(5))
+    #filter(date_ICU_admit >= forecast_dates$date_estimates_start + days(5))
+  
   
   
   
@@ -159,8 +173,12 @@ plot_outputs <- function(
   
   ED_linelist_subset <- ED_linelist  %>%
     
-    filter(date_onset >= forecast_dates$date_estimates_start,
-           date_presentation < forecast_dates$date_hospital_linelist - days(2)) %>% 
+    filter(
+      #date_onset >= forecast_dates$date_estimates_start,
+      date_onset >= plot_start_date,
+      date_presentation < forecast_dates$date_hospital_linelist - days(2),
+      date_presentation >= date_onset, date_presentation <= date_onset + days(14)
+    ) %>% 
     
     arrange(date_presentation) %>%
     group_by(person_id) %>%
@@ -170,7 +188,8 @@ plot_outputs <- function(
   
   ED_presentation_counts <- ED_linelist_subset %>%
     count(date_presentation) %>%
-    filter(date_presentation >= ymd("2022-12-01"))
+    filter(date_presentation >= plot_start_date + days(5))
+    #filter(date_presentation >= forecast_dates$date_estimates_start + days(5))
   
   
   p_ED_presentations <- plot_data_admissions %>%
@@ -209,14 +228,14 @@ plot_outputs <- function(
       ggplot(plot_data_admissions %>% filter(quant == 50)) + 
         geom_ribbon(aes(x = date, ymin = lower, ymax = upper, fill = scenario_label)) +
         scale_fill_manual(values = ggokabeito::palette_okabe_ito(c(1,2,3, 5)), labels = forecast_labels, name = NULL) + 
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom", legend.direction = "vertical")
     ),
     ncol = 1,
-    rel_heights = c(12, 1)
+    rel_heights = c(12, 3)
   )
   
   
-  ggsave(str_c(plot_dir, "/results_combined_ward.png"), width = 7, height = 8, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_results_combined_ward.png"), width = 7, height = 8, bg = "white")
   
   
   
@@ -231,14 +250,14 @@ plot_outputs <- function(
       ggplot(plot_data_admissions %>% filter(quant == 50)) + 
         geom_ribbon(aes(x = date, ymin = lower, ymax = upper, fill = scenario_label)) +
         scale_fill_manual(values = ggokabeito::palette_okabe_ito(c(1,2,3, 5)), labels = forecast_labels, name = NULL) + 
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom", legend.direction = "vertical")
     ),
     ncol = 1,
-    rel_heights = c(12, 1)
+    rel_heights = c(12, 3)
   )
   
   
-  ggsave(str_c(plot_dir, "/results_combined_ICU.png"), width = 7, height = 6, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_results_combined_ICU.png"), width = 7, height = 6, bg = "white")
   
   
   
@@ -248,11 +267,11 @@ plot_outputs <- function(
       ggplot(plot_data_admissions %>% filter(quant == 50)) + 
         geom_ribbon(aes(x = date, ymin = lower, ymax = upper, fill = scenario_label)) +
         scale_fill_manual(values = ggokabeito::palette_okabe_ito(c(1,2,3, 5)), labels = forecast_labels, name = NULL) + 
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom", legend.direction = "vertical")
     ),
     ncol = 1,
-    rel_heights = c(12, 1)
+    rel_heights = c(12, 3)
   )
   
-  ggsave(str_c(plot_dir, "/results_combined_ED.png"), width = 7, height = 5, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_results_combined_ED.png"), width = 7, height = 5, bg = "white")
 }

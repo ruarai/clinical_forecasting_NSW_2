@@ -42,7 +42,7 @@ plot_time_varying_estimates <- function(
   
   p_age
   
-  ggsave(str_c(plot_dir, "/age_distribution.png"), width = 10, height = 6, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_age_distribution.png"), width = 10, height = 6, bg = "white")
   
   
   
@@ -128,7 +128,7 @@ plot_time_varying_estimates <- function(
   
   
   
-  ggsave(str_c(plot_dir, "/time_varying_estimates.png"), width = 10, height = 9, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_time_varying_estimates.png"), width = 10, height = 9, bg = "white")
   
   
   
@@ -171,7 +171,7 @@ plot_time_varying_estimates <- function(
   
   p_ED
   
-  ggsave(str_c(plot_dir, "/time_varying_estimates_ED.png"), width = 10, height = 6, bg = "white")
+  ggsave(str_c(plot_dir, "/", forecast_dates$date_forecast, "_time_varying_estimates_ED.png"), width = 10, height = 6, bg = "white")
   
 }
 

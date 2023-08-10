@@ -2,11 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
-
-
 _targets
 results
-
 *.csv
 *.rds
 *.pdf
+data

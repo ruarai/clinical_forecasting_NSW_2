@@ -23,12 +23,15 @@ source("R/plot_outputs.R")
 source("R/plot_outputs_aged.R")
 source("R/plot_time_varying_estimates.R")
 
+source("R/read_interim_data.R")
+
 
 scenarios <- tribble(
   ~scenario_label, ~scenario_name, ~scenario_column,
-  "base", "Base", rlang::sym("Base"),
-  "cts", "CTs. evol.", rlang::sym("Cts evol"),
-  "486P", "486P only", rlang::sym("486P only"),
+  "xbb_null", "XBB.1.16 No waning or seasonality", rlang::sym("XBB.1.16 No waning or seasonality"),
+  "xbb_no_season", "XBB.1.16 Waning no seasonality", rlang::sym("XBB.1.16 Waning no seasonality"),
+  "xbb_waning_season_10", "XBB.1.16 Waning, 10% Seasonal effect", rlang::sym("XBB.1.16 Waning, 10% Seasonal effect"),
+  "xbb_waning_season_20", "XBB.1.16 Waning, 20% Seasonal effect", rlang::sym("XBB.1.16 Waning, 20% Seasonal effect"),
 )
 
 
@@ -49,15 +52,17 @@ targets_map <- tar_map(
 )
 
 list(
-  tar_target(hospital_linelist_path, "~/source/email_digester/downloads/hospital_linelist/NSW_out_episode_2023_02_28.xlsx"),
-  tar_target(ED_linelist_path, "../email_digester/downloads/ED_linelist/NSW_out_ED_2023_02_28.xlsx"),
+  tar_target(forecast_date, ymd("2023-07-12")),
   
-  tar_target(case_linelist_path, "~/source/email_digester/downloads/case_linelist/20230227 - Case list - Freya Shearer.zip"),
   
-  tar_target(forecast_path, "~/source/clinical_forecasting_NSW/data/cases/Projections_20230227a.csv"),
-  tar_target(asc_path, "~/source/clinical_forecasting_NSW/data/cases/Ascertainment0227a.csv"),
+  tar_target(hospital_linelist_path, "data/NSW_out_episode_2023_07_12.xlsx"),
+  tar_target(ED_linelist_path, "data/NSW_out_ED_2023_07_12.xlsx"),
   
-  tar_target(forecast_date, ymd("2023-02-28")),
+  tar_target(forecast_path, "data/Projections_20230712r.csv"),
+  tar_target(asc_path, "data/Ascertainment20230712r.csv"),
+  
+  
+  tar_target(case_linelist, read_interim_data("data/RATs_specdate_10ygroups_20230711.csv")),
   
   tar_target(
     plot_dir,
@@ -76,19 +81,17 @@ list(
       select(date_onset, asc)
   ),
   
-  tar_target(n_bootstraps, 100),
+  tar_target(n_bootstraps, 50),
   
-  tar_target(forecast_dates, get_forecast_dates(hospital_linelist_path, case_linelist_path)),
+  tar_target(forecast_dates, get_forecast_dates(hospital_linelist_path, case_linelist %>% pull(date_onset) %>% max(), forecast_date)),
   
   
-  tar_target(hospital_linelist_raw, readxl::read_excel(hospital_linelist_path, sheet = "NSW_out_episode")),
+  tar_target(hospital_linelist_raw, readxl::read_excel(hospital_linelist_path, sheet = "NSW_out_person")),
   tar_target(ED_linelist_raw, readxl::read_excel(ED_linelist_path, sheet = "NSW_out_ED")),
-  tar_target(case_linelist_raw, read_nsw_cases(case_linelist_path) %>% filter(TEST_TYPE == "RAT")),
   
   
   tar_target(hospital_linelist, format_hospital_linelist(hospital_linelist_raw)),
   tar_target(ED_linelist, format_ED_linelist(ED_linelist_raw)),
-  tar_target(case_linelist, format_case_linelist(case_linelist_raw)),
   
   tar_target(occupancy_data, calculate_occupancy(hospital_linelist)),
   tar_target(occupancy_data_aged, calculate_occupancy_aged(hospital_linelist)),
