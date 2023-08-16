@@ -68,7 +68,7 @@ list(
     plot_dir,
     {
       dir <- str_c("results/fc_NSW_", forecast_date, "/")
-      dir.create(dir, showWarnings = FALSE)
+      dir.create(dir, showWarnings = FALSE, recursive = TRUE)
       return(dir)
     }
   ),
